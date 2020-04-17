@@ -1,0 +1,756 @@
+---
+title: "Computational Modeling - Assignment 2"
+author: "Sofie Ditmer"
+date: "29/01/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## In this assignment we learn how to assess rates from a binomial distribution, using the case of assessing your teachers' knowledge of CogSci
+
+N.B. there is a second part at the bottom for next week.
+
+### First part
+
+You want to assess your teachers' knowledge of cognitive science. "These guys are a bunch of drama(turgist) queens, mindless philosophers, chattering communication people and Russian spies. Do they really know CogSci?", you think.
+
+To keep things simple (your teachers should not be faced with too complicated things):
+- You created a pool of equally challenging questions on CogSci
+- Each question can be answered correctly or not (we don't allow partially correct answers, to make our life simpler).
+- Knowledge of CogSci can be measured on a scale from 0 (negative knowledge, all answers wrong) through 0.5 (random chance) to 1 (awesome CogSci superpowers)
+
+This is the data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Josh: 160 correct answers out of 198 questions (Josh never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+Questions:
+
+1. What's Riccardo's estimated knowledge of CogSci (the posterior)? What is the probability he knows more than chance (0.5) [try figuring this out. if you can't peek into chapters 3.1 and 3.2 and/or the slides]?
+
+- First implement a grid approximation (hint check paragraph 2.4.1!) with a uniform prior (this is what we have assumed so far in frequentist statistics), calculate the posterior and plot the results (produce a plot that has both the prior and the posterior)
+
+- Then implement a quadratic approximation (hint check paragraph 2.4.2!).
+
+- N.B. for the rest of the exercise just keep using the grid approximation (we'll move to quadratic approximations in two classes)
+
+```{r}
+library(rethinking)
+library(tidyverse)
+library(ggplot2)
+library(brms)
+
+## Grid approximation ## 
+
+# Define the grid
+dens = 1e4 # we choose 20 because this is a good density - not too small not too big
+p_grid <- seq(from = 0 , to = 1 , length.out = dens)
+
+# Define the prior
+prior_riccardo_1 <- rep(1,1e4) #Flat
+
+# Test the prior (does it look crazy?)
+dens(rbinom(1e4, 6, runif(1e4, 0, 1))) # the runif funciton extracts a number randomly from the uniform distribution. 1e4 is 10.0000. In a uniform disrtibution all values are equally likely, and we tell the it that the values are 0 and 1 and the runif extracts 10.000 values form this distribution. 10.000 is a big number, which means that it gives us a full representation - it covers the tails. This gives us a distribution of possible correct answers given the priors. This is useful for knowing how uncertain our predictions are.
+
+# Compute the likelihood at each value in grid. Riccardo got 3 questions right out of 6.
+likelihood_riccardo_1 <- dbinom(3, size = 6, prob = p_grid ) #when we calculate the likelihood we know that data but we do not know the  probabiltiies, which is why we use the dbinom() function - a caluclation of the density. Thus it calculate how probable the values are in the entire grid.
+
+# Compute the posterior (likelihood by prior)
+unstd.posterior_riccardo_1 <- likelihood_riccardo_1 * prior_riccardo_1
+
+# Standardize the posterior (so it sums to 1 - or close to 1)
+posterior_riccardo_1 <- unstd.posterior_riccardo_1 / sum(unstd.posterior_riccardo_1)
+
+# Draw the plot
+d <- data.frame(grid = p_grid, posterior = posterior_riccardo_1, prior = prior_riccardo_1, likelihood = likelihood_riccardo_1)
+
+ggplot(d, aes(grid, posterior_riccardo_1)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior_riccardo_1/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# The curve of the plot is smooth because it assumes that the values around the most probable values are more likley than the values far away, which is why it smoothes out the curve.
+
+## Quadratic Approximation ## 
+globe.qa <- map( alist(
+  w ~ dbinom(6,p) , # binomial likelihood
+  p ~ dunif(0,1) # uniform prior
+), 
+data = list(w=3))
+
+precis( globe.qa )
+
+
+```
+
+2. Estimate all the teachers' knowledge of CogSci. Who's best? Use grid approximation. Comment on the posteriors of Riccardo and Mikkel.
+2a. Produce plots of the prior, and posterior for each teacher (the prior and the posterior need to be in the same plot)
+
+```{r}
+# Kristian
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+
+prior_kristian_1 <-rep(1, 1e4) #Flat prior
+
+dens(rbinom(1e4, 2, runif(1e4, 0, 1)))
+
+likelihood_kristian_1 <- dbinom(2, size = 2, prob = p_grid )
+
+unstd.posterior_kristian_1 <- likelihood_kristian_1 * prior_kristian_1
+
+posterior_kristian_1 <- unstd.posterior_kristian_1 / sum(unstd.posterior_kristian_1)
+
+k <- data.frame(grid = p_grid, posterior = posterior_kristian_1, prior = prior_kristian_1, likelihood = likelihood_kristian_1)
+
+ggplot(k, aes(grid, posterior_kristian_1)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior_kristian_1/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Josh
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+
+prior_josh_1 <- rep(1, 1e4) #Flat
+
+dens(rbinom(1e4, 198, runif(1e4, 0, 1)))
+
+likelihood_josh_1 <- dbinom(160, size = 198, prob = p_grid )
+
+unstd.posterior_josh_1 <- likelihood_josh_1 * prior_josh_1
+
+posterior_josh_1 <- unstd.posterior_josh_1 / sum(unstd.posterior_josh_1)
+
+j <- data.frame(grid = p_grid, posterior = posterior_josh_1, prior = prior_josh_1, likelihood = likelihood_josh_1)
+
+ggplot(j, aes(grid, posterior_josh_1)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior_josh_1/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Mikkel
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+
+prior_mikkel_1 <- rep(1,1e4) #Flat
+
+dens(rbinom(1e4, 132, runif(1e4, 0, 1)))
+
+likelihood_mikkel_1 <- dbinom(66, size = 132, prob = p_grid )
+
+unstd.posterior_mikkel_1 <- likelihood_mikkel_1 * prior_mikkel_1
+
+posterior_mikkel_1 <- unstd.posterior_mikkel_1 / sum(unstd.posterior_mikkel_1)
+
+m <- data.frame(grid = p_grid, posterior = posterior_mikkel_1, prior = prior_mikkel_1, likelihood = likelihood_mikkel_1)
+
+ggplot(m, aes(grid, posterior_mikkel_1)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior_mikkel_1/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+```
+
+3. Change the prior. Given your teachers have all CogSci jobs, you should start with a higher appreciation of their knowledge: the prior is a normal distribution with a mean of 0.8 and a standard deviation of 0.2. Do the results change (and if so how)? Look at the posteriors when you have a flat prior compared to when you have an informed prior.
+3a. Produce plots of the prior and posterior for each teacher.
+
+```{r}
+# Riccardo
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior<- dnorm(p_grid, 0.8, 0.2) # normally distributed prior that is sensibly centered at chance
+dens(rbinom(1e4, 6, rnorm(1e4, 0.8, 0.2))) # we also change this to fit the new prior
+likelihood <- dbinom(3, size = 6, prob = p_grid )
+unstd.posterior <- likelihood * prior
+posterior <- unstd.posterior / sum(unstd.posterior)
+d <- data.frame(grid = p_grid, posterior = posterior, prior = prior, likelihood = likelihood)
+
+ggplot(d, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Kristian
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior<- dnorm(p_grid, 0.8, 0.2) # normally distributed prior that is sensibly centered at chance
+dens(rbinom(1e4, 2, rnorm(1e4, 0.8, 0.2))) # we also change this to fit the new prior
+likelihood <- dbinom(2, size = 2, prob = p_grid )
+unstd.posterior <- likelihood * prior
+posterior <- unstd.posterior / sum(unstd.posterior)
+k <- data.frame(grid = p_grid, posterior = posterior, prior = prior, likelihood = likelihood)
+
+ggplot(k, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Josh
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior<- dnorm(p_grid, 0.8, 0.2) # normally distributed prior that is sensibly centered at chance
+dens(rbinom(1e4, 198, rnorm(1e4, 0.8, 0.2))) # we also change this to fit the new prior
+likelihood <- dbinom(160, size = 198, prob = p_grid )
+unstd.posterior <- likelihood * prior
+posterior <- unstd.posterior / sum(unstd.posterior)
+j <- data.frame(grid = p_grid, posterior = posterior, prior = prior, likelihood = likelihood)
+
+ggplot(j, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Mikkel
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior<- dnorm(p_grid, 0.8, 0.2) # normally distributed prior that is sensibly centered at chance
+dens(rbinom(1e4, 132, rnorm(1e4, 0.8, 0.2))) # we also change this to fit the new prior
+likelihood <- dbinom(66, size = 132, prob = p_grid )
+unstd.posterior <- likelihood * prior
+posterior <- unstd.posterior / sum(unstd.posterior)
+m <- data.frame(grid = p_grid, posterior = posterior, prior = prior, likelihood = likelihood)
+
+ggplot(m, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+```
+
+4. You go back to your teachers and collect more data (multiply the previous numbers by 100 - both the questions and the answer). This is to see what happens when we increase the amount of data. Calculate their knowledge with both a uniform prior and a normal prior with a mean of 0.8 and a standard deviation of 0.2. Do you still see a difference between the results? Why? Thus, when the data increases what happens to the posteriors?
+
+```{r}
+# Riccardo
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior1 <-rep(1,1e4) # flat prior
+prior2 <- dnorm(p_grid, 0.8, 0.2) # normal prior
+dens(rbinom(1e4, 600, runif(1e4, 0, 1)))
+dens(rbinom(1e4, 600, rnorm(1e4, 0.8, 0.2)))
+likelihood <- dbinom(300, size = 600, prob = p_grid )
+unstd.posterior1 <- likelihood * prior1 # posterior 1
+unstd.posterior2 <- likelihood * prior2 # posterior 2
+posterior1 <- unstd.posterior1 / sum(unstd.posterior1)
+posterior2 <- unstd.posterior2 / sum(unstd.posterior2)
+
+d1 <- data.frame(grid = p_grid, posterior = posterior1, prior = prior1, likelihood = likelihood)
+d2 <- data.frame(grid = p_grid, posterior = posterior2, prior = prior2, likelihood = likelihood)
+
+# Plotting posterior for prior 1
+ggplot(d1, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# PLotting posterior for prior 2
+ggplot(d2, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Kristian
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior1 <-rep(1,1e4) # flat prior
+prior2 <- dnorm(p_grid, 0.8, 0.2) # normal prior
+dens(rbinom(1e4, 200, runif(1e4, 0, 1)))
+dens(rbinom(1e4, 200, rnorm(1e4, 0.8, 0.2)))
+likelihood <- dbinom(200, size = 200, prob = p_grid )
+unstd.posterior1 <- likelihood * prior1 # posterior 1
+unstd.posterior2 <- likelihood * prior2 # posterior 2
+posterior1 <- unstd.posterior1 / sum(unstd.posterior1)
+posterior2 <- unstd.posterior2 / sum(unstd.posterior2)
+
+d1 <- data.frame(grid = p_grid, posterior = posterior1, prior = prior1, likelihood = likelihood)
+d2 <- data.frame(grid = p_grid, posterior = posterior2, prior = prior2, likelihood = likelihood)
+
+# Plotting posterior for prior 1
+ggplot(d1, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# PLotting posterior for prior 2
+ggplot(d2, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Josh
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior1 <-rep(1,1e4) # flat prior
+prior2 <- dnorm(p_grid, 0.8, 0.2) # normal prior
+dens(rbinom(1e4, 19800, runif(1e4, 0, 1)))
+dens(rbinom(1e4, 19800, rnorm(1e4, 0.8, 0.2)))
+likelihood <- dbinom(16000, size = 19800, prob = p_grid )
+unstd.posterior1 <- likelihood * prior1 # posterior 1
+unstd.posterior2 <- likelihood * prior2 # posterior 2
+posterior1 <- unstd.posterior1 / sum(unstd.posterior1)
+posterior2 <- unstd.posterior2 / sum(unstd.posterior2)
+
+d1 <- data.frame(grid = p_grid, posterior = posterior1, prior = prior1, likelihood = likelihood)
+d2 <- data.frame(grid = p_grid, posterior = posterior2, prior = prior2, likelihood = likelihood)
+
+# Plotting posterior for prior 1
+ggplot(d1, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# PLotting posterior for prior 2
+ggplot(d2, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# Mikkel
+p_grid <- seq(from = 0 , to = 1 , length.out = 1e4)
+prior1 <-rep(1,1e4) # flat prior
+prior2 <- dnorm(p_grid, 0.8, 0.2) # normal prior
+dens(rbinom(1e4, 13200, runif(1e4, 0, 1)))
+dens(rbinom(1e4, 13200, rnorm(1e4, 0.8, 0.2)))
+likelihood <- dbinom(6600, size = 13200, prob = p_grid )
+unstd.posterior1 <- likelihood * prior1 # posterior 1
+unstd.posterior2 <- likelihood * prior2 # posterior 2
+posterior1 <- unstd.posterior1 / sum(unstd.posterior1)
+posterior2 <- unstd.posterior2 / sum(unstd.posterior2)
+
+d1 <- data.frame(grid = p_grid, posterior = posterior1, prior = prior1, likelihood = likelihood)
+d2 <- data.frame(grid = p_grid, posterior = posterior2, prior = prior2, likelihood = likelihood)
+
+# Plotting posterior for prior 1
+ggplot(d1, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+# PLotting posterior for prior 2
+ggplot(d2, aes(grid, posterior)) + 
+  geom_point() +
+  geom_line() +
+  theme_classic() + 
+  geom_line(aes(grid, prior/dens), color= 'red') +
+  xlab('Knowledge of CogSci') +
+  ylab('posterior probability')
+
+```
+
+5. Imagine you're a skeptic and think your teachers do not know anything about CogSci, given the content of their classes. How would you operationalize that belief? Discuss in groups which priors you would use
+
+We would choose a normal prior that peaks at 0.5 (chance-level), thus expecting that the teachers are at chance level in answering the questions. We expect the normal prior to have a small standard deviation of 0.1 because we expect that most of the teachers will be at chance-level. 
+
+6. Optional question: Can you estimate the difference between Riccardo's estimated knowledge and that of each of the other teachers? Would you deem it credible (that is, would you believe that it is actually different)?
+
+7. Bonus knowledge: all the stuff we have done can be implemented in a lme4-like fashion using the brms package. Here is an example.
+```{r}
+library(brms)
+
+data <- data.frame(
+  Correct=c(3,2,160,66),
+  Questions=c(6,2,198,132),
+  Teacher=c("RF","KT","JS","MW"))
+
+# Model sampling only from the prior (for checking the predictions your prior leads to)
+FlatModel_priorCheck <- brm(Correct|trials(Questions) ~ 1, 
+                 data = subset(data, Teacher=="RF"),
+                 prior = prior("uniform(0,1)", class = "Intercept"),
+                 family = binomial,
+                 sample_prior = "only") # here we tell the model to ignore the data
+
+# Plotting the predictions of the model (prior only) against the actual data
+pp_check(FlatModel_priorCheck, nsamples = 100)
+
+# Model sampling by combining prior and likelihood
+FlatModel <- brm(Correct|trials(Questions) ~ 1, 
+                 data = subset(d, Teacher=="RF"),
+                 prior = prior("uniform(0,1)", class = "Intercept"),
+                 family = binomial,
+                 sample_prior = T)
+# Plotting the predictions of the model (prior + likelihood) against the actual data
+pp_check(FlatModel, nsamples = 100)
+
+# plotting the posteriors and the sampling process
+plot(FlatModel)
+
+
+PositiveModel_priorCheck <- brm(Correct|trials(Questions) ~ 1,
+                     data = subset(d, Teacher=="RF"),
+                     prior = prior("normal(0.8,0.2)", 
+                                   class = "Intercept"),
+                     family=binomial,
+                     sample_prior = "only")
+pp_check(PositiveModel_priorCheck, nsamples = 100)
+
+PositiveModel <- brm(Correct|trials(Questions) ~ 1,
+                     data = subset(d, Teacher=="RF"),
+                     prior = prior("normal(0.8,0.2)", 
+                                   class = "Intercept"),
+                     family=binomial,
+                     sample_prior = T)
+pp_check(PositiveModel, nsamples = 100)
+plot(PositiveModel)
+
+SkepticalModel_priorCheck <- brm(Correct|trials(Questions) ~ 1, 
+                      data = subset(d, Teacher=="RF"),
+                      prior=prior("normal(0.5,0.01)", class = "Intercept"),
+                      family=binomial,
+                      sample_prior = "only")
+pp_check(SkepticalModel_priorCheck, nsamples = 100)
+
+SkepticalModel <- brm(Correct|trials(Questions) ~ 1, 
+                      data = subset(d, Teacher=="RF"),
+                      prior = prior("normal(0.5,0.01)", class = "Intercept"),
+                      family = binomial,
+                      sample_prior = T)
+pp_check(SkepticalModel, nsamples = 100)
+plot(SkepticalModel)
+```
+
+If you dare, try to tweak the data and model to test two hypotheses:
+- Is Kristian different from Josh?
+- Is Josh different from chance?
+
+### Second part: Focusing on predictions
+
+Last year you assessed the teachers (darned time runs quick!). Now you want to re-test them and assess whether your models are producing reliable predictions. In Methods 3 we learned how to do machine-learning style assessment of predictions (e.g. rmse on testing datasets). Bayesian stats makes things a bit more complicated. So we'll try out how that works. N.B. You can choose which prior to use for the analysis of last year's data.
+
+Questions to be answered (but see guidance below):
+1- Write a paragraph discussing how assessment of prediction performance is different in Bayesian vs. frequentist models
+2- Provide at least one plot and one written line discussing prediction errors for each of the teachers.
+
+This is the old data:
+- Riccardo: 3 correct answers out of 6 questions
+- Kristian: 2 correct answers out of 2 questions (then he gets bored)
+- Josh: 160 correct answers out of 198 questions (Josh never gets bored)
+- Mikkel: 66 correct answers out of 132 questions
+
+This is the new data:
+- Riccardo: 9 correct answers out of 10 questions (then he freaks out about teaching preparation and leaves)
+- Kristian: 8 correct answers out of 12 questions
+- Josh: 148 correct answers out of 172 questions (again, Josh never gets bored)
+- Mikkel: 34 correct answers out of 65 questions
+
+Guidance Tips
+
+1. There are at least two ways of assessing predictions.
+2. Last year's results are this year's expectations.
+3. Are the parameter estimates changing? (way 1)
+4. How does the new data look in last year's predictive posterior? (way 2)
+
+```{r}
+# Question 2
+
+## RICCARDO ##
+# We use the posterior from part 1 as the new prior. We then use the function below to calculate the new posterior for Riccardo using the old posterior as the prior.
+
+# First we define the function to calculate the knowledge of Riccardo (the posterior)
+calc_teacher <- function(n_correct, n_question, prior, length.out = 1e4){
+  # this function calculates the posterior
+  p_grid <- seq(from = 0 , to = 1 , length.out = length.out)
+  likelihood <- dbinom(n_correct, 
+                       size = n_question, 
+                       prob = p_grid)
+  unstd_posterior <- prior * likelihood
+  posterior <- unstd_posterior/sum(unstd_posterior)
+  return(list(teacher_posterior = posterior, 
+              likelihood = likelihood,
+              grid = p_grid))
+}
+
+# Now we can use this function on Riccardo's new data (9 correct out of 10) to calculate the knowledge of Riccardo (the posterior)
+riccardo_knowledge <- calc_teacher(9, 10, prior = posterior_riccardo_1)
+
+# Now we want to plot the posterior. We define a function that can plot it for us.
+plot <- function(p_grid, prior, likelihood, posterior, title = " "){
+  # define data
+  d <- tibble(p_grid = p_grid, 
+              prior = prior, 
+              likelihood = likelihood,
+              posterior = posterior)
+  
+  # make to long format
+  d <- d %>% 
+    pivot_longer(cols = c("prior", "likelihood", "posterior"), names_to = "name", values_to = "value")
+  
+  # make a 
+  p <- ggplot(d, aes(x = p_grid, y = value, color = name)) + 
+    geom_line() + 
+    labs(x = "x", y = "Density", title = title) + 
+    theme_bw() + 
+    ggplot2::theme(panel.background = element_rect(fill = "white"),
+                   panel.border = element_blank()) +
+    scale_colour_brewer(palette = "Dark2", direction = 1)
+  
+  return(p)
+}
+
+# Now we use the function to plot Riccardo's posterior
+plot(p_grid = riccardo_knowledge$grid,
+     prior = posterior_riccardo_1,
+     likelihood = riccardo_knowledge$likelihood,
+     posterior = riccardo_knowledge$teacher_posterior, 
+     title = "Riccardo's knowledge")
+
+# Now that we have the new posterior for Riccardo, we want to see if he has learned anything from the first posterior. We do this by comparing the the two posteriors. 
+
+# First we plot the difference between the old and new posteriors. Thus, we subtract the new posterior from the old posterior and look at the variance that is left, which will tell us something about whether or not Riccardo has learnt anything.
+
+# We define a function that can plot it for us
+
+subtract_plot <- function(posterior, title = " "){
+  # define data
+  d <- tibble(p_grid = p_grid, 
+              substracted_posterior = posterior)
+  
+  # make to long format
+  d <- d %>% 
+    pivot_longer(cols = c("substracted_posterior"), names_to = "name", values_to = "value")
+  
+  p <- ggplot(d, aes(x = p_grid, y = value, color = name)) + 
+    geom_line() + 
+    labs(x = "x", y = "Density", title = title) + 
+    theme_bw() + 
+    ggplot2::theme(panel.background = element_rect(fill = "white"),
+                   panel.border = element_blank()) +
+    scale_colour_brewer(palette = "Dark2", direction = 1)
+  return(p)
+}
+
+# Now we use the function and subtract the old posterior from the new posterior
+subtract_plot((riccardo_knowledge$teacher_posterior - posterior_riccardo_1))
+
+# Another way to compare the poteriors is to take the sum of the all of the proability that lies above 0.5 (above chance) and compare these two sums for the two posteriors
+
+# old posterior
+sum(posterior_riccardo_1[ p_grid > 0.5 ])
+
+# new posterior
+sum(riccardo_knowledge$teacher_posterior[riccardo_knowledge$grid > 0.5])
+
+# Conclusion: we can see that in the old posterior half of the probabilities are above chance (0.5) while in the new posterior 98% of the probabilities are above chance, which suggests that Riccarodo has definitely learned something. 
+
+# We also need to sample from the distribution in order to get a mean and a standard deviation in order to compare whether Riccardo has learned anything (is the old Riccardo better or worse than the new Riccardo?)
+
+# First we create variables containing the old and new posteior
+riccardo_pos_old <- posterior_riccardo_1
+riccardo_pos_new <- riccardo_knowledge$teacher_posterior
+
+# We then sample from the old and new posterior with 10.000 samples
+riccardo_sample_old <- sample(size = 100000, x = p_grid, prob = riccardo_pos_old, replace = T)
+riccardo_sample_new <- sample(size = 100000, x = p_grid, prob = riccardo_pos_new, replace = T)
+
+# we then calcualte the mean and sd for the samples
+mean(riccardo_sample_old)
+sd(riccardo_sample_old)
+
+mean(riccardo_sample_new)
+sd(riccardo_sample_new)
+
+# We now see what the probability is of the old riccardo being smarter than the new riccardo
+sum(riccardo_sample_new > riccardo_sample_old)/100000*100
+
+# This means that it is 83% likely that the new riccardo is smarter than the old riccardo, which means that riccardo has definitely learned something 
+
+
+## KRISTIAN ##
+# Now we do the exact same calculations for Kristian, in order to see if he has learned anything.
+
+kristian_knowledge <- calc_teacher(8, 12, prior = posterior_kristian_1)
+
+plot(p_grid = kristian_knowledge$grid,
+     prior = posterior_kristian_1,
+     likelihood = kristian_knowledge$likelihood,
+     posterior = kristian_knowledge$teacher_posterior, 
+     title = "Kristian's knowledge")
+
+# Now that we have the new posterior for Riccardo, we want to see if he has learned anything from the first posterior. We do this by comparing the the two posteriors. 
+
+# First we plot the difference between the old and new posteriors. Thus, we subtract the new posterior from the old posterior and look at the variance that is left, which will tell us something about whether or not Kristian has learnt anything.
+
+subtract_plot(kristian_knowledge$teacher_posterior - posterior_kristian_1, title = "New posterior minus old posterior")
+
+# Conclusion: the plot suggests that Kristian has not learned a lot because there is not a lot of density above 0.8, which suggests that the old posterior had a lot of density here that was subtracted from the new posterior, suggesting that Kristian has become worse. 
+
+# Given that the plot suggests that Kristian has become worse since the first time he answered the questions, because there is less of the probability mass above chance, we want to look at the probabilitity mass that lies above 0.75 - the top 25% and compare the old and the new posterior.
+
+# old posterior
+sum(posterior_kristian_1[ p_grid > 0.75 ])
+
+# new posterior
+sum(kristian_knowledge$teacher_posterior[kristian_knowledge$grid > 0.75])
+
+# Conclusion: We can see that in the old posterior about 59% of the probability mass lies above 0.75, which means that Kristian was very likely to answer correct in the first posterior, but with the new posterior onlu 27% of the probability mass lies above 0.75 which means that he has become worse and is now more likely to answer closer to chance-level than before.
+
+# We also need to sample from the distribution in order to get a mean and a standard deviation in order to compare whether Kristian has learned anything (is the old Kristian better or worse than the new Kristian?)
+
+# First we create variables containing the old and new posteior
+kristian_pos_old <- posterior_kristian_1
+kristian_pos_new <- kristian_knowledge$teacher_posterior
+
+# We then sample from the old and new posterior with 10.000 samples
+kristian_sample_old <- sample(size = 100000, x = p_grid, prob = kristian_pos_old, replace = T)
+kristian_sample_new <- sample(size = 100000, x = p_grid, prob = kristian_pos_new, replace = T)
+
+# we then calcualte the mean and sd for the samples
+mean(kristian_sample_old)
+sd(kristian_sample_old)
+
+mean(kristian_sample_new)
+sd(kristian_sample_new)
+
+# We now see what the probability is of the old riccardo being smarter than the new riccardo
+sum(kristian_sample_new > kristian_sample_old)/100000*100
+
+# This means that it is 29% likely that the new kristian is smarter than the old kristian.
+
+## JOSH ##
+# Now we do the exact same calculations for Josh, in order to see if he has learned anything.
+
+josh_knowledge <- calc_teacher(148, 172, prior = posterior_josh_1)
+
+plot(p_grid = josh_knowledge$grid,
+     prior = posterior_josh_1,
+     likelihood = josh_knowledge$likelihood,
+     posterior = josh_knowledge$teacher_posterior, 
+     title = "Josh's knowledge")
+
+# In the plot we can see that the old posterior (prior) and new posterior overlap which suggests that Josh has only improved a little
+
+# Now that we have the new posterior for Josh, we want to see if he has learned anything from the first posterior. We do this by comparing the the two posteriors. 
+
+# First we plot the difference between the old and new posteriors. Thus, we subtract the new posterior from the old posterior and look at the variance that is left, which will tell us something about whether or not Josh has learnt anything.
+
+subtract_plot(josh_knowledge$teacher_posterior - posterior_josh_1, title = "New posterior minus old posterior")
+
+# Conclusion: the plot suggests that Josh has improved, because we can see that more of the probability mass lies above 0.75 which it did not in the old posterior. Because Josh has a lot of data it takes a lot to actually move his posterior, which means that his improvement it large.
+
+# Given that the plot suggests that Josh has improved we want to look at the probabilitity mass that lies above 0.80 - the top 20% and compare the old and the new posterior.
+
+# old posterior
+sum(posterior_josh_1[ p_grid > 0.80 ])
+
+# new posterior
+sum(josh_knowledge$teacher_posterior[josh_knowledge$grid > 0.80])
+
+# Conclusion: We can see that for Josh's old posterior 33% of the posterior mass lies above 0.8, and for his new posterior 88.5% lies above 0.8 which suggests that Josh has improved since he now has more chance to answer above chance than before.
+
+# We also need to sample from the distribution in order to get a mean and a standard deviation in order to compare whether Josh has learned anything (is the old Josh better or worse than the new Josh?)
+
+# First we create variables containing the old and new posteior
+josh_pos_old <- posterior_josh_1
+josh_pos_new <- josh_knowledge$teacher_posterior
+
+# We then sample from the old and new posterior with 10.000 samples
+josh_sample_old <- sample(size = 100000, x = p_grid, prob = josh_pos_old, replace = T)
+josh_sample_new <- sample(size = 100000, x = p_grid, prob = josh_pos_new, replace = T)
+
+# we then calcualte the mean and sd for the samples
+mean(josh_sample_old)
+sd(josh_sample_old)
+
+mean(josh_sample_new)
+sd(josh_sample_new)
+
+# We now see what the probability is of the old riccardo being smarter than the new riccardo
+sum(josh_sample_new > josh_sample_old)/100000*100
+
+# This means that it is 59% likely that the new Josh is smarter than the old Josh
+
+
+## MIKKEL ##
+# Now we do the exact same calculations for Mikkel, in order to see if he has learned anything.
+
+mikkel_knowledge <- calc_teacher(34, 65, prior = posterior_mikkel_1)
+
+plot(p_grid = mikkel_knowledge$grid,
+     prior = posterior_mikkel_1,
+     likelihood = mikkel_knowledge$likelihood,
+     posterior = mikkel_knowledge$teacher_posterior, 
+     title = "Mikkel's knowledge")
+
+# In the plot we can see that Mikkel's old posterior (prior) and his new posterior overlaps a lot suggesting that he has not learned anything 
+
+# Now that we have the new posterior for Mikkel, we want to see if he has learned anything from the first posterior. We do this by comparing the the two posteriors. 
+
+# First we plot the difference between the old and new posteriors. Thus, we subtract the new posterior from the old posterior and look at the variance that is left, which will tell us something about whether or not Mikkel has learnt anything.
+
+subtract_plot(mikkel_knowledge$teacher_posterior - posterior_mikkel_1, title = "New posterior minus old posterior")
+
+# Conclusion: From this plot we can see that Mikkel has improved a little bit, because more of the probability mass lies above chance in the new posterior compared to the old posterior. However, this is a very little improvement, because the old posterior and the new posterior overlap so much.
+
+# Because we can see that Mikkel has improved a little bit, we want to compare the probability mass above chance for the old posterior and the new posterior 
+
+# old posterior
+sum(posterior_mikkel_1[ p_grid > 0.5 ])
+
+# new posterior
+sum(mikkel_knowledge$teacher_posterior[mikkel_knowledge$grid > 0.5])
+
+# Conclusion: we can see that there is a slight change in probability mass that lies above chance for the old posterior and new posterior, suggesting that Mikkel has improved a little bit since there is still a lot of overlap between the old and new posteriors. 
+
+# We also need to sample from the distribution in order to get a mean and a standard deviation in order to compare whether Mikkel has learned anything (is the old Mikkel better or worse than the new Mikkel?)
+
+# First we create variables containing the old and new posteior
+mikkel_pos_old <- posterior_mikkel_1
+mikkel_pos_new <- mikkel_knowledge$teacher_posterior
+
+# We then sample from the old and new posterior with 10.000 samples
+mikkel_sample_old <- sample(size = 100000, x = p_grid, prob = mikkel_pos_old, replace = T)
+mikkel_sample_new <- sample(size = 100000, x = p_grid, prob = mikkel_pos_new, replace = T)
+
+# we then calcualte the mean and sd for the samples
+mean(mikkel_sample_old)
+sd(mikkel_sample_old)
+
+mean(mikkel_sample_new)
+sd(mikkel_sample_new)
+
+# We now see what the probability is of the old riccardo being smarter than the new riccardo
+sum(mikkel_sample_new > mikkel_sample_old)/100000*100
+
+# This means that it is 36% likely that the new Mikkel is smarter than the old Mikkel
+
+```
+
+
